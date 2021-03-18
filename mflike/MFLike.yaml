@@ -12,6 +12,16 @@ input_file: null
 # realizations that share the same bandpowers and covariance)
 cov_Bbl_file: null
 
+# Parameters to handle the band integration
+# bandint_nstep sets the number of frequencies used in the integration
+# bandint_width sets the relative width of the band wrt the central frequency
+# with bandint_width: 0 no band integration is performed
+# if bandint_width > 0 , bandint_nstep must be > 1
+# bandint_width can be a list if you want a different width for each band 
+# e.g. bandint_width: [0.3,0.2,0.3] for 3 bands 
+bandint_nstep: 1
+bandint_width: 0
+
 # Specify default set of spectra and scale cuts
 # to be used
 defaults:

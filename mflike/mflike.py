@@ -48,8 +48,7 @@ class MFLike(_InstallableLikelihood):
                 self.log, "The 'data_folder' directory does not exist. "
                           "Check the given path [%s].", self.data_folder)
 
-        self.bandint_nstep = 1
-        self.bandint_width = 0
+        self.bandint_nstep = np.int(self.bandint_nstep)
 
         # Read data
         self.prepare_data()
@@ -333,14 +332,18 @@ class MFLike(_InstallableLikelihood):
         Dls = {s: cl[s][self.l_bpws] for s, _ in self.lcuts.items()}
 
         #Bandpass construction 
-        if (self.bandint_width > 0):
+        if not hasattr(self.bandint_width, "__len__"):
+            self.bandint_width = np.full_like(self.freqs,self.bandint_width,dtype=np.float)
+        if np.any(np.array(self.bandint_width) > 0):
             assert self.bandint_nstep > 1 , 'bandint_width and bandint_nstep not coherent'
+            assert np.all(np.array(self.bandint_width) > 0), 'one band has width = 0, set a positive width and run again'
 
             self.bandint_freqs = []
-            for fr in self.freqs:
+            for ifr,fr in enumerate(self.freqs):
                 bandpar = 'bandint_shift_'+str(fr)
-                bandlow = fr*(1-self.bandint_width*.5)
-                bandhigh = fr*(1+self.bandint_width*.5)
+                bandlow = fr*(1-self.bandint_width[ifr]*.5)
+                bandhigh = fr*(1+self.bandint_width[ifr]*.5)
+                print(bandlow,bandhigh)
                 nubtrue = np.linspace(bandlow,bandhigh,self.bandint_nstep)
                 nub = np.linspace(bandlow+params_values[bandpar],bandhigh+params_values[bandpar],self.bandint_nstep)
                 tranb = _cmb2bb(nub)
