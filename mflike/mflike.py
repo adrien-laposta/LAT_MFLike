@@ -344,13 +344,13 @@ class MFLike(_InstallableLikelihood):
                 bandlow = fr*(1-self.bandint_width[ifr]*.5)
                 bandhigh = fr*(1+self.bandint_width[ifr]*.5)
                 print(bandlow,bandhigh)
-                nubtrue = np.linspace(bandlow,bandhigh,self.bandint_nstep)
-                nub = np.linspace(bandlow+params_values[bandpar],bandhigh+params_values[bandpar],self.bandint_nstep)
+                nubtrue = np.linspace(bandlow,bandhigh,self.bandint_nstep,dtype=float)
+                nub = np.linspace(bandlow+params_values[bandpar],bandhigh+params_values[bandpar],self.bandint_nstep,dtype=float)
                 tranb = _cmb2bb(nub)
                 tranb_norm = np.trapz(_cmb2bb(nubtrue),nubtrue)
                 self.bandint_freqs.append([nub,tranb/tranb_norm])
         else:
-            self.bandint_freqs = np.empty_like(self.freqs)
+            self.bandint_freqs = np.empty_like(self.freqs,dtype=float)
             for ifr,fr in enumerate(self.freqs):
                 bandpar = 'bandint_shift_'+str(fr)
                 self.bandint_freqs[ifr] = fr+params_values[bandpar]
