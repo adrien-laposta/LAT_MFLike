@@ -182,6 +182,14 @@ class _MFLike(InstallableLikelihood):
 
         return self._loglike(cl, fg_totals, params_values)
 
+    def _any_in_requested_cls(self, modes: list | str) -> bool:
+        """
+        """
+        if isinstance(modes, str):
+            return modes in self.requested_cls
+        if isinstance(modes, list):
+            return np.any([m in self.requested_cls for m in modes])
+
     def _prepare_data(self):
         r"""
         Reads the sacc data, extracts the data tracers,
@@ -605,15 +613,21 @@ class _MFLike(InstallableLikelihood):
 
         cal_pars = {}
         calG_all = 1 / nuis_params["calG_all"]
-        if "tt" in self.requested_cls or "te" in self.requested_cls:
+        if self._any_in_requested_cls(["tt", "te"]):
             cal_pars["t"] = {
                 exp: calG_all / (nuis_params[f"cal_{exp}"] * nuis_params.get(f"calT_{exp}", 1))
                 for exp in self.experiments
             }
 
-        if "ee" in self.requested_cls or "te" in self.requested_cls:
+        if self._any_in_requested_cls(["ee", "te"]):
             cal_pars["e"] = {
                 exp: calG_all / (nuis_params[f"cal_{exp}"] * nuis_params[f"calE_{exp}"])
+                for exp in self.experiments
+            }
+
+        if self._any_in_requested_cls("bb"):
+            cal_pars["b"] = {
+                exp: calG_all / (nuis_params[f"cal_{exp}"] * nuis_params.get(f"calE_{exp}", 1))
                 for exp in self.experiments
             }
 

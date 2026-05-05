@@ -276,11 +276,21 @@ class Foreground(Theory):
                 fgf.ModifiedBlackBody(), fgf.ModifiedBlackBody(), fgp.PowerLaw()
             )
 
+        if "ee" in self.requested_cls or "bb" in self.requested_cls:
+            self.sync = fgc.FactorizedCrossSpectrum(fgf.PowerLaw(), fgp.PowerLaw())
         self.radio = fgc.FactorizedCrossSpectrum(fgf.PowerLaw(), fgp.PowerLaw())
         self.dust = fgc.FactorizedCrossSpectrum(fgf.ModifiedBlackBody(), fgp.PowerLaw())
 
         if self.ells is None:
             self.ells = np.arange(self.lmin, self.lmax + 1)
+
+    def _any_in_requested_cls(self, modes: list | str) -> bool:
+        """
+        """
+        if isinstance(modes, str):
+            return modes in self.requested_cls
+        if isinstance(modes, list):
+            return np.any([m in self.requested_cls for m in modes])
 
     # Gets the actual power spectrum of foregrounds given the passed parameters
     def _get_foreground_model_arrays(self, fg_params: dict, ell: np.ndarray | None = None) -> dict:
@@ -391,7 +401,28 @@ class Foreground(Theory):
                 },
                 {"ell": ell, "ell_0": 500.0, "alpha": fg_params["alpha_dE"]},
             )
-
+            model["ee", "sync"] = fg_params["a_see"] * self.sync(
+                {"nu": self.bandint_freqs_P, "nu_0": nu_0, "beta": fg_params["beta_sync"]},
+                {"ell": ell, "ell_0": ell_0, "alpha": fg_params["alpha_sE"]},
+            )
+        if "bb" in self.requested_cls:
+            model["bb", "radio"] = fg_params["a_psbb"] * self.radio(
+                {"nu": self.bandint_freqs_P, "nu_0": nu_0, "beta": fg_params["beta_s"]},
+                {"ell": ell_clp, "ell_0": ell_0clp, "alpha": fg_params["alpha_s"]},
+            )
+            model["bb", "dust"] = fg_params["a_gbb"] * self.dust(
+                {
+                    "nu": self.bandint_freqs_P,
+                    "nu_0": nu_0,
+                    "temp": fg_params["T_effd"],
+                    "beta": fg_params["beta_d"],
+                },
+                {"ell": ell, "ell_0": 500.0, "alpha": fg_params["alpha_dB"]},
+            )
+            model["bb", "sync"] = fg_params["a_sbb"] * self.sync(
+                {"nu": self.bandint_freqs_P, "nu_0": nu_0, "beta": fg_params["beta_sync"]},
+                {"ell": ell, "ell_0": ell_0, "alpha": fg_params["alpha_sB"]},
+            )
         if "te" in self.requested_cls:
             model["te", "radio"] = fg_params["a_pste"] * self.radioTE(
                 {"nu": self.bandint_freqs_T, "nu_0": nu_0, "beta": fg_params["beta_s"]},
@@ -668,9 +699,9 @@ class BandpowerForeground(Foreground):
                         # normalization integral to be evaluated at the shifted freqs
                         # in order to have cmb component calibrated to 1
                         tranb_norm = trapezoid(_cmb2bb(nub), nub)
-                        if "tt" in self.requested_cls or "te" in self.requested_cls:
+                        if self._any_in_requested_cls(["tt", "te"]):
                             self.bandint_freqs_T.append([nub, tranb / tranb_norm])
-                        if "te" in self.requested_cls or "ee" in self.requested_cls:
+                        if self._any_in_requested_cls(["te", "ee", "bb"]):
                             self.bandint_freqs_P.append([nub, tranb / tranb_norm])
                     else:
                         if self.bandsh_beams_path:
@@ -679,11 +710,11 @@ class BandpowerForeground(Foreground):
                             # not propagating bandpass shifts to the chromatic beams
                             blT, blP = self.return_beams(exp, nu_ghz, 0.0)
 
-                        if "tt" in self.requested_cls or "te" in self.requested_cls:
+                        if self._any_in_requested_cls(["tt", "te"]):
                             bpT = _cmb2bb(nub)[..., np.newaxis] * blT
                             self.bandint_freqs_T.append([nub, bpT / trapezoid(bpT, nub, axis=0)])
 
-                        if "te" in self.requested_cls or "ee" in self.requested_cls:
+                        if self._any_in_requested_cls(["te", "ee", "bb"]):
                             bpP = _cmb2bb(nub)[..., np.newaxis] * blP
                             self.bandint_freqs_P.append([nub, bpP / trapezoid(bpP, nub, axis=0)])
 
@@ -692,9 +723,9 @@ class BandpowerForeground(Foreground):
                 if self.bandint_nsteps == 1:
                     nub = fr + shift
                     data_are_monofreq = True
-                    if "tt" in self.requested_cls or "te" in self.requested_cls:
+                    if self._any_in_requested_cls(["tt", "te"]):
                         self.bandint_freqs_T.append(nub)
-                    if "te" in self.requested_cls or "ee" in self.requested_cls:
+                    if self._any_in_requested_cls(["te", "ee", "bb"]):
                         self.bandint_freqs_P.append(nub)
             # using the bandpass from sacc file
             else:
@@ -702,17 +733,17 @@ class BandpowerForeground(Foreground):
                 if len(bp) == 1:
                     # Monofrequency channel
                     data_are_monofreq = True
-                    if "tt" in self.requested_cls or "te" in self.requested_cls:
+                    if self._any_in_requested_cls(["te", "tt"]):
                         self.bandint_freqs_T.append(nub[0])
-                    if "te" in self.requested_cls or "ee" in self.requested_cls:
+                    if self._any_in_requested_cls(["te", "ee", "bb"]):
                         self.bandint_freqs_P.append(nub[0])
                 else:
                     if not self.use_beam_profile:
                         trans_norm = trapezoid(bp * _cmb2bb(nub), nub)
                         trans = bp / trans_norm * _cmb2bb(nub)
-                        if "tt" in self.requested_cls or "te" in self.requested_cls:
+                        if self._any_in_requested_cls(["tt", "te"]):
                             self.bandint_freqs_T.append([nub, trans])
-                        if "te" in self.requested_cls or "ee" in self.requested_cls:
+                        if self._any_in_requested_cls(["te", "ee", "bb"]):
                             self.bandint_freqs_P.append([nub, trans])
                     else:
                         if self.bandsh_beams_path:
@@ -721,11 +752,11 @@ class BandpowerForeground(Foreground):
                             # not propagating bandpass shifts to the chromatic beams
                             blT, blP = self.return_beams(exp, nu_ghz, 0.0)
 
-                        if "tt" in self.requested_cls or "te" in self.requested_cls:
+                        if self._any_in_requested_cls(["tt", "te"]):
                             bpT = bp[..., np.newaxis] * _cmb2bb(nub)[..., np.newaxis] * blT
                             self.bandint_freqs_T.append([nub, bpT / trapezoid(bpT, nub, axis=0)])
 
-                        if "te" in self.requested_cls or "ee" in self.requested_cls:
+                        if self._any_in_requested_cls(["te", "ee", "bb"]):
                             bpP = bp[..., np.newaxis] * _cmb2bb(nub)[..., np.newaxis] * blP
                             self.bandint_freqs_P.append([nub, bpP / trapezoid(bpP, nub, axis=0)])
 
